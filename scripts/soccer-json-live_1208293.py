@@ -126,9 +126,12 @@ def determine_update_interval(match_id):
     start_time_kst = get_match_start_time(match_id)
 
     if not start_time_kst:
+        print(f"⚠️ 경기 {match_id}의 시작 시간을 가져올 수 없음.")
         return None
 
     time_diff = (start_time_kst - now_kst).total_seconds()
+
+    print(f"⏳ 현재 시간: {now_kst}, 경기 시작 시간: {start_time_kst}, 차이: {time_diff}초")
 
     if time_diff > 86400:  # 경기 하루 전 (24시간 = 86400초)
         return 10800  # 3시간(10800초) 단위
@@ -140,6 +143,7 @@ def determine_update_interval(match_id):
         return 60  # 1분(60초) 단위
     else:
         return 60  # 연장전 포함, 1분 유지
+
 
 # ✅ 실행 루프
 def run_update_loop(match_id):
