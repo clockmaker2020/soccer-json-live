@@ -127,12 +127,18 @@ def determine_update_interval(match_id):
 
     if not start_time_kst:
         print(f"⚠️ 경기 {match_id}의 시작 시간을 가져올 수 없음.")
-        return None
+        return 10800  # 기본값: 3시간
 
     time_diff = (start_time_kst - now_kst).total_seconds()
 
     print(f"⏳ 현재 시간: {now_kst}, 경기 시작 시간: {start_time_kst}, 차이: {time_diff}초")
 
+    # 잘못된 time_diff 값 필터링 (예: 경기 시간이 잘못되었거나 이미 종료된 경우)
+    if time_diff < -86400:  # 경기 종료 후 하루가 지남
+        print("🚫 경기 시간이 지나쳤음. 업데이트 중지.")
+        return None
+
+    # 경기 시작 전, 업데이트 주기 설정
     if time_diff > 86400:  # 경기 하루 전 (24시간 = 86400초)
         return 10800  # 3시간(10800초) 단위
     elif time_diff > 7200:  # 경기 당일 (2시간 초과)
@@ -143,6 +149,7 @@ def determine_update_interval(match_id):
         return 60  # 1분(60초) 단위
     else:
         return 60  # 연장전 포함, 1분 유지
+
 
 
 
@@ -167,7 +174,13 @@ def run_update_loop(match_id):
                 print("🏁 경기 종료됨. 업데이트 중단.")
                 break
 
+        # 중복 실행 방지
+        if interval > 3600:  # 1시간 이상 업데이트 간격이 설정되면 GitHub Actions에서 실행되도록 종료
+            print("⏹ 1시간 이상 주기 설정됨. GitHub Actions에서 실행하도록 중지.")
+            break
+
         time.sleep(interval)
+
 
 # ✅ 실행 (경기 ID 입력 필요)
 if __name__ == "__main__":
