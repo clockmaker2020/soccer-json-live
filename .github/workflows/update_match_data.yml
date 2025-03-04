@@ -1,18 +1,14 @@
-name: Update Match Data
-
 on:
   schedule:
     - cron: "0 */3 * * *"    # 하루 전까지 3시간 단위 업데이트
-    - cron: "0 0-23/1 * * *" # 경기 당일 1시간 단위 업데이트 (중복 방지)
+    - cron: "0 0-23/1 * * *" # 경기 당일 1시간 단위 업데이트
     - cron: "*/5 0-23/1 * * *"  # 경기 시작 20분 전까지 5분 단위 업데이트 (경기 당일만)
     - cron: "*/1 0-23/1 * * *"  # 경기 시작 5분 전부터 1분 단위 업데이트 (경기 당일만)
 
-
-  workflow_dispatch:        # 수동 실행 기능 추가
-
 jobs:
   update_match_data:
-    runs-on: ubuntu-latest  # GitHub Actions 실행 환경
+    runs-on: ubuntu-latest
+    concurrency: update_match_data  # ✅ 여러 개의 Actions가 동시에 실행되지 않도록 설정
 
     steps:
       - name: 📥 저장소 체크아웃
