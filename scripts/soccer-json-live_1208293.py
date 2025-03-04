@@ -18,10 +18,14 @@ def fetch_data(url):
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
-        return response.json().get("response", [])
+        data = response.json()
+        
+        print(f"🌐 API 응답 데이터: {json.dumps(data, indent=4, ensure_ascii=False)}")  # 응답 데이터 확인
+        return data.get("response", [])
     except requests.exceptions.RequestException as e:
         print(f"⚠️ [ERROR] API 요청 실패: {e}")
         return []
+
 
 # ✅ 경기 시작 시간 가져오기 (UTC → KST 변환)
 def get_match_start_time(match_id):
