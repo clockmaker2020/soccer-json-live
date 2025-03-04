@@ -1,129 +1,166 @@
-document.addEventListener("DOMContentLoaded", function () {
-    let matchId = "1208293";
-    let baseUrl = "https://clockmaker2020.github.io/soccer-json-live/data/";
+import os
+import json
+import requests
+import time
+from datetime import datetime, timedelta, timezone
 
-    let urls = {
-        "overview": `${baseUrl}match_${matchId}_overview.json`,
-        "teams": `${baseUrl}match_${matchId}_teams.json`,
-        "odds": `${baseUrl}match_${matchId}_odds.json`,
-        "h2h": `${baseUrl}match_${matchId}_h2h.json`,
-        "injuries": `${baseUrl}match_${matchId}_injuries.json`,
-        "live": `${baseUrl}match_${matchId}_live.json`
-    };
+# ✅ API 설정
+API_KEY = "0776a35eb1067086efe59bb7f93c6498"
+HEADERS = {"x-apisports-key": API_KEY}
+BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
-    function fetchJson(url) {
-        return fetch(url)
-            .then(response => response.ok ? response.json() : Promise.reject(`HTTP 오류: ${response.status}`))
-            .catch(error => {
-                console.error(`❌ JSON 로드 실패: ${url}`, error);
-                return null;
-            });
+# ✅ 저장할 폴더 설정
+DATA_DIR = r"C:\Users\clock_p93\Downloads"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# ✅ API 요청 함수
+def fetch_data(url):
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
+        return response.json().get("response", [])
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️ [ERROR] API 요청 실패: {e}")
+        return []
+
+# ✅ 경기 시작 시간 가져오기 (UTC → KST 변환)
+def get_match_start_time(match_id):
+    url = f"{BASE_URL}?id={match_id}"
+    match_details = fetch_data(url)
+
+    if not match_details:
+        print(f"❌ 경기 {match_id} 정보를 가져올 수 없음.")
+        return None
+
+    match_data = match_details[0]
+    fixture_info = match_data["fixture"]
+
+    utc_time = datetime.strptime(fixture_info["date"], "%Y-%m-%dT%H:%M:%S%z")
+    kst_time = utc_time.astimezone(timezone(timedelta(hours=9)))  # UTC+9 변환
+    return kst_time
+
+# ✅ 특정 경기 ID를 받아 실시간 데이터 수집
+def get_match_data(match_id):
+    url = f"{BASE_URL}?id={match_id}"
+    match_details = fetch_data(url)
+    
+    if not match_details:
+        print(f"❌ 경기 {match_id} 데이터를 가져올 수 없음.")
+        return
+
+    match_data = match_details[0]
+    fixture_info = match_data["fixture"]
+    teams = match_data["teams"]
+    events = match_data.get("events", [])
+    stats = match_data.get("statistics", [])
+    league_info = match_data.get("league", {})
+
+    # 🕒 UTC 시간 -> KST 시간 변환
+    utc_time = datetime.strptime(fixture_info["date"], "%Y-%m-%dT%H:%M:%S%z")
+    kst_time = utc_time.astimezone(timezone(timedelta(hours=9)))
+
+    # 🏟 경기 개요 데이터
+    overview_data = {
+        "경기 ID": match_id,
+        "경기 날짜": kst_time.strftime("%Y-%m-%d %H:%M"),
+        "경기장": fixture_info["venue"]["name"],
+        "도시": fixture_info["venue"]["city"],
+        "경기 상태": fixture_info["status"]["long"],
+        "리그": league_info.get("name", "N/A"),
+        "라운드": league_info.get("round", "N/A"),
+        "심판": fixture_info.get("referee", "N/A") or "N/A",
+        "관중 수": fixture_info.get("attendance", "N/A") or "N/A"
     }
 
-    function setElementText(id, text) {
-        let element = document.getElementById(id);
-        if (element) element.innerHTML = text || "데이터 없음";
+    # ⚽ 팀 정보 데이터
+    teams_data = {
+        "홈팀": {
+            "이름": teams["home"]["name"],
+            "로고": teams["home"]["logo"]
+        },
+        "원정팀": {
+            "이름": teams["away"]["name"],
+            "로고": teams["away"]["logo"]
+        }
     }
 
-    function setElementImage(id, src) {
-        let element = document.getElementById(id);
-        if (element) element.src = src;
+    # 🔥 실시간 경기 정보
+    live_data = {
+        "현재 점수": f"{match_data['goals']['home']} - {match_data['goals']['away']}",
+        "경기 상태": fixture_info["status"]["long"],
+        "주요 경기 이벤트": [
+            {
+                "이벤트 종류": event.get("type", "N/A"),
+                "선수": event.get("player", {}).get("name", "N/A"),
+                "팀": event.get("team", {}).get("name", "N/A"),
+                "시간": event.get("time", {}).get("elapsed", "N/A")
+            }
+            for event in events
+        ],
+        "경기 통계": [
+            {
+                "팀": stat["team"]["name"],
+                "항목": stat["type"],
+                "수치": stat["value"]
+            }
+            for stat in stats
+        ]
     }
 
-    function loadMatchData() {
-        Promise.all([
-            fetchJson(urls["overview"]),
-            fetchJson(urls["teams"]),
-            fetchJson(urls["odds"]),
-            fetchJson(urls["h2h"]),
-            fetchJson(urls["injuries"])
-        ]).then(([overview, teams, odds, h2h, injuries]) => {
-            if (!overview || !teams || !odds || !h2h || !injuries) {
-                console.warn("⚠️ 일부 JSON 파일이 로드되지 않았습니다.");
-                return;
-            }
+    # ✅ JSON 파일로 저장
+    base_path = os.path.join(DATA_DIR, f"match_{match_id}")
+    with open(f"{base_path}_overview.json", "w", encoding="utf-8") as f:
+        json.dump(overview_data, f, ensure_ascii=False, indent=4)
+    with open(f"{base_path}_teams.json", "w", encoding="utf-8") as f:
+        json.dump(teams_data, f, ensure_ascii=False, indent=4)
+    with open(f"{base_path}_live.json", "w", encoding="utf-8") as f:
+        json.dump(live_data, f, ensure_ascii=False, indent=4)
 
-            // 📌 1. 경기 개요 데이터 적용
-            if (overview) {
-                setElementText("match-date", overview["경기 날짜"] || "날짜 정보 없음");
-                setElementText("stadium", overview["경기장"] || "경기장 정보 없음");
-                setElementText("city", overview["도시"] || "도시 정보 없음");
-                setElementText("match-status", overview["경기 상태"] || "경기 상태 없음");
-                setElementText("league", overview["리그"] || "리그 정보 없음");
-                setElementText("round", overview["라운드"] || "라운드 정보 없음");
-                setElementText("referee", overview["심판"] || "심판 정보 없음");
-                setElementText("attendance", overview["관중 수"] || "관중 정보 없음");
-            }
+    print(f"✅ 경기 {match_id} 개요 저장 완료: match_{match_id}_overview.json")
+    print(f"✅ 경기 {match_id} 팀정보 저장 완료: match_{match_id}_teams.json")
+    print(f"✅ 경기 {match_id} 실시간 저장 완료: match_{match_id}_live.json")
 
-            // 📌 2. 팀 정보 적용
-            if (teams) {
-                setElementText("home-team", teams["홈팀"]["이름"] || "홈팀 없음");
-                setElementText("away-team", teams["원정팀"]["이름"] || "원정팀 없음");
-                setElementImage("home-logo", teams["홈팀"]["로고"] || "");
-                setElementImage("away-logo", teams["원정팀"]["로고"] || "");
-            }
+# ✅ 경기 시작 시간에 따른 업데이트 주기 결정
+def determine_update_interval(match_id):
+    now_kst = datetime.now(timezone(timedelta(hours=9)))  # 현재 KST 시간
+    start_time_kst = get_match_start_time(match_id)
 
-            // 📌 3. 배당률 정보 적용
-            if (odds) {
-                setElementText("home-odds", odds["홈 승리 확률"] || "배당률 없음");
-                setElementText("draw-odds", odds["무승부 확률"] || "배당률 없음");
-                setElementText("away-odds", odds["원정 승리 확률"] || "배당률 없음");
-            }
+    if not start_time_kst:
+        return None
 
-            console.log("✅ 경기 기본 정보 업데이트 완료");
-        });
-    }
+    time_diff = (start_time_kst - now_kst).total_seconds()
 
-    loadMatchData();
+    if time_diff > 86400:  # 경기 하루 전 (24시간 = 86400초)
+        return 10800  # 3시간(10800초) 단위
+    elif time_diff > 7200:  # 경기 당일 (2시간 초과)
+        return 3600  # 1시간(3600초) 단위
+    elif time_diff > 1200:  # 경기 시작 20분 전까지 (1200초 = 20분)
+        return 300  # 5분(300초) 단위
+    elif time_diff > 300:  # 경기 시작 5분 전까지 (300초 = 5분)
+        return 60  # 1분(60초) 단위
+    else:
+        return 60  # 연장전 포함, 1분 유지
 
-    // ✅ 실시간 경기 데이터 가져오기
-    function fetchLiveData() {
-        fetchJson(urls["live"]).then(liveData => {
-            if (!liveData) {
-                console.warn("⚠️ 실시간 데이터 없음");
-                return;
-            }
+# ✅ 실행 루프
+def run_update_loop(match_id):
+    while True:
+        interval = determine_update_interval(match_id)
 
-            console.log("✅ 실시간 경기 데이터 로드 성공:", liveData);
+        if interval is None:
+            print("❌ 업데이트 주기 결정 실패. 프로그램 종료.")
+            break
 
-            // ✅ 경기 점수
-            let score = liveData["현재 점수"] || "⚽ 경기 시작 전";
-            let goals = liveData["득점 기록"] || [];
-            let events = liveData["주요 경기 이벤트"] || [];
-            let statistics = liveData["경기 통계"] || [];
+        get_match_data(match_id)
+        print(f"🕒 {interval}초 후 데이터 업데이트 예정...")
+        time.sleep(interval)
 
-            let liveScoreElement = document.getElementById("live-score");
-            let goalRecordElement = document.getElementById("goal-record");
-            let matchEventsElement = document.getElementById("match-events");
+        # 경기 종료 감지
+        match_status = get_match_start_time(match_id)
+        if match_status and match_status in ["Match Finished", "Cancelled", "Postponed"]:
+            print("🏁 경기 종료됨. 업데이트 중단.")
+            break
 
-            // ✅ 득점 기록 변환
-            let goalText = goals.length > 0 ? goals.map(g => `⚽ ${g}`).join("<br>") : "득점 없음";
-
-            // ✅ 주요 경기 이벤트 변환
-            let eventText = events.length > 0 ? events.map(e => `📢 ${e}`).join("<br>") : "주요 이벤트 없음";
-
-            // ✅ 경기 통계 변환 (예: 점유율, 슈팅 수 등)
-            let statsText = statistics.length > 0
-                ? statistics.map(stat => `${stat["팀"]}: ${stat["항목"]} - ${stat["수치"]}`).join("<br>")
-                : "경기 통계 없음";
-
-            // ✅ HTML 업데이트
-            liveScoreElement.innerHTML = score;
-            goalRecordElement.innerHTML = goalText;
-            matchEventsElement.innerHTML = eventText;
-
-            console.log("✅ 실시간 경기 정보 업데이트 완료", liveData);
-        }).catch(error => {
-            console.error("❌ 실시간 경기 정보 로드 실패:", error);
-        });
-    }
-
-    // ✅ 사용자가 버튼을 클릭했을 때만 실시간 데이터 불러오기
-    let updateButton = document.getElementById("update-button");
-    updateButton.addEventListener("click", function () {
-        console.log("✅ 준실시간 업데이트 버튼 클릭됨: 실시간 데이터 불러오기 시작");
-        fetchLiveData();
-        updateButton.style.backgroundColor = "#90EE90"; // 옅은 녹색으로 버튼 변경
-        setTimeout(() => updateButton.style.backgroundColor = "#FFC0CB", 5000); // 5초 후 원래 색상 복귀
-    });
-});
+# ✅ 실행 (경기 ID 입력 필요)
+if __name__ == "__main__":
+    match_id = 1208293  # 원하는 경기 ID
+    run_update_loop(match_id)
