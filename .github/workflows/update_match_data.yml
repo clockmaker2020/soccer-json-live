@@ -1,0 +1,47 @@
+name: Update Match Data
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"    # 하루 전까지 3시간 단위 업데이트
+    - cron: "0 0-23/1 * * *" # 경기 당일 1시간 단위 업데이트 (중복 방지)
+    - cron: "*/5 0-23/1 * * *"  # 경기 시작 20분 전까지 5분 단위 업데이트 (경기 당일만)
+    - cron: "*/1 0-23/1 * * *"  # 경기 시작 5분 전부터 1분 단위 업데이트 (경기 당일만)
+
+
+  workflow_dispatch:        # 수동 실행 기능 추가
+
+jobs:
+  update_match_data:
+    runs-on: ubuntu-latest  # GitHub Actions 실행 환경
+
+    steps:
+      - name: 📥 저장소 체크아웃
+        uses: actions/checkout@v3
+
+      - name: 🛠️ Python 환경 설정 및 캐싱
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: 📦 필수 패키지 설치
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: ⏳ 경기 업데이트 실행
+        run: |
+          python scripts/soccer-json-live_1208293.py
+
+      - name: 📤 변경된 데이터 푸시
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          if ! git diff --quiet; then
+            git add data/*
+            git commit -m "🔄 경기 데이터 업데이트: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            git push
+          else
+            echo "No changes to commit"
+          fi
