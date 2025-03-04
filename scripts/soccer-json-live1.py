@@ -1,136 +1,129 @@
-import os
-import json
-import requests
-from datetime import datetime, timedelta
+document.addEventListener("DOMContentLoaded", function () {
+    let matchId = "1208293";
+    let baseUrl = "https://clockmaker2020.github.io/soccer-json-live/data/";
 
-# ✅ API 설정
-API_KEY = "0776a35eb1067086efe59bb7f93c6498"
-HEADERS = {"x-apisports-key": API_KEY}
+    let urls = {
+        "overview": `${baseUrl}match_${matchId}_overview.json`,
+        "teams": `${baseUrl}match_${matchId}_teams.json`,
+        "odds": `${baseUrl}match_${matchId}_odds.json`,
+        "h2h": `${baseUrl}match_${matchId}_h2h.json`,
+        "injuries": `${baseUrl}match_${matchId}_injuries.json`,
+        "live": `${baseUrl}match_${matchId}_live.json`
+    };
 
-# ✅ 저장할 폴더 설정
-DATA_DIR = os.path.join(os.getcwd(), "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# ✅ API 요청 함수
-def fetch_data(url):
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        return response.json().get("response", [])
-    except requests.exceptions.RequestException as e:
-        print(f"⚠️ [ERROR] API 요청 실패: {e}")
-        return []
-
-# ✅ 특정 경기 ID를 받아 실시간 데이터 수집
-def get_match_data(match_id):
-    detail_url = f"https://v3.football.api-sports.io/fixtures?id={match_id}"
-    match_details = fetch_data(detail_url)
-    
-    if not match_details:
-        print(f"❌ 경기 {match_id} 데이터를 가져올 수 없음.")
-        return
-    
-    match_data = match_details[0]
-    fixture_info = match_data["fixture"]
-    teams = match_data["teams"]
-    events = match_data.get("events", [])
-    stats = match_data.get("statistics", [])
-    lineups = match_data.get("lineups", [])
-    players = match_data.get("players", [])
-    league_info = match_data.get("league", {})
-
-    # 🕒 UTC 시간 -> KST 시간 변환
-    utc_time = datetime.strptime(fixture_info["date"], "%Y-%m-%dT%H:%M:%S%z")
-    kst_time = utc_time + timedelta(hours=9)
-
-    # 🏟 경기 개요 데이터
-    overview_data = {
-        "경기 ID": match_id,
-        "경기 날짜": kst_time.strftime("%Y-%m-%d %H:%M"), 
-        "경기장": fixture_info["venue"]["name"],
-        "도시": fixture_info["venue"]["city"],
-        "경기 상태": fixture_info["status"]["long"],
-        "리그": league_info.get("name", "N/A"),
-        "라운드": league_info.get("round", "N/A"),
-        "심판": fixture_info.get("referee", "N/A") or "N/A",
-        "관중 수": fixture_info.get("attendance", "N/A") or "N/A"
+    function fetchJson(url) {
+        return fetch(url)
+            .then(response => response.ok ? response.json() : Promise.reject(`HTTP 오류: ${response.status}`))
+            .catch(error => {
+                console.error(`❌ JSON 로드 실패: ${url}`, error);
+                return null;
+            });
     }
 
-    # ⚽ 팀 정보 데이터
-    teams_data = {
-        "홈팀": {
-            "이름": teams["home"]["name"],
-            "로고": teams["home"]["logo"]
-        },
-        "원정팀": {
-            "이름": teams["away"]["name"],
-            "로고": teams["away"]["logo"]
-        }
+    function setElementText(id, text) {
+        let element = document.getElementById(id);
+        if (element) element.innerHTML = text || "데이터 없음";
     }
 
-    # 🔥 실시간 경기 정보
-    live_data = {
-        "현재 점수": f"{match_data['goals']['home']} - {match_data['goals']['away']}",
-        "경기 상태": fixture_info["status"]["long"],
-        "득점 기록": [
-            {
-                "시간": event["time"]["elapsed"],
-                "선수": event["player"]["name"],
-                "팀": event["team"]["name"]
-            }
-            for event in events if event["type"] == "Goal"
-        ],
-        "주요 경기 이벤트": [
-            {
-                "이벤트 종류": event["type"],
-                "선수": event.get("player", {}).get("name", "N/A"),
-                "팀": event.get("team", {}).get("name", "N/A"),
-                "시간": event.get("time", {}).get("elapsed", "N/A")
-            }
-            for event in events
-        ],
-        "경기 통계": [
-            {
-                "팀": stat["team"]["name"],
-                "항목": stat["type"],
-                "수치": stat["value"]
-            }
-            for stat in stats
-        ],
-        "선수 명단 및 라인업": [
-            {
-                "팀": lineup["team"]["name"],
-                "포메이션": lineup["formation"],
-                "선발 선수": [player["player"]["name"] for player in lineup["startXI"]],
-                "교체 선수": [player["player"]["name"] for player in lineup["substitutes"]]
-            }
-            for lineup in lineups
-        ],
-        "선수별 통계": [
-            {
-                "선수": player["player"]["name"],
-                "팀": player["team"]["name"],
-                "포지션": player["player"]["position"],
-                "스탯": player["statistics"]
-            }
-            for team in players for player in team["players"]
-        ]
+    function setElementImage(id, src) {
+        let element = document.getElementById(id);
+        if (element) element.src = src;
     }
 
-    # ✅ JSON 파일로 저장
-    base_path = os.path.join(DATA_DIR, f"match_{match_id}")
-    with open(f"{base_path}_overview.json", "w", encoding="utf-8") as f:
-        json.dump(overview_data, f, ensure_ascii=False, indent=4)
-    with open(f"{base_path}_teams.json", "w", encoding="utf-8") as f:
-        json.dump(teams_data, f, ensure_ascii=False, indent=4)
-    with open(f"{base_path}_live.json", "w", encoding="utf-8") as f:
-        json.dump(live_data, f, ensure_ascii=False, indent=4)
+    function loadMatchData() {
+        Promise.all([
+            fetchJson(urls["overview"]),
+            fetchJson(urls["teams"]),
+            fetchJson(urls["odds"]),
+            fetchJson(urls["h2h"]),
+            fetchJson(urls["injuries"])
+        ]).then(([overview, teams, odds, h2h, injuries]) => {
+            if (!overview || !teams || !odds || !h2h || !injuries) {
+                console.warn("⚠️ 일부 JSON 파일이 로드되지 않았습니다.");
+                return;
+            }
 
-    print(f"✅ 경기 {match_id} 개요 저장 완료: match_{match_id}_overview.json")
-    print(f"✅ 경기 {match_id} 팀정보 저장 완료: match_{match_id}_teams.json")
-    print(f"✅ 경기 {match_id} 실시간 저장 완료: match_{match_id}_live.json")
+            // 📌 1. 경기 개요 데이터 적용
+            if (overview) {
+                setElementText("match-date", overview["경기 날짜"] || "날짜 정보 없음");
+                setElementText("stadium", overview["경기장"] || "경기장 정보 없음");
+                setElementText("city", overview["도시"] || "도시 정보 없음");
+                setElementText("match-status", overview["경기 상태"] || "경기 상태 없음");
+                setElementText("league", overview["리그"] || "리그 정보 없음");
+                setElementText("round", overview["라운드"] || "라운드 정보 없음");
+                setElementText("referee", overview["심판"] || "심판 정보 없음");
+                setElementText("attendance", overview["관중 수"] || "관중 정보 없음");
+            }
 
-# ✅ 테스트 실행
-if __name__ == "__main__":
-    match_id = 123456  # 원하는 경기 ID로 변경
-    get_match_data(match_id)
+            // 📌 2. 팀 정보 적용
+            if (teams) {
+                setElementText("home-team", teams["홈팀"]["이름"] || "홈팀 없음");
+                setElementText("away-team", teams["원정팀"]["이름"] || "원정팀 없음");
+                setElementImage("home-logo", teams["홈팀"]["로고"] || "");
+                setElementImage("away-logo", teams["원정팀"]["로고"] || "");
+            }
+
+            // 📌 3. 배당률 정보 적용
+            if (odds) {
+                setElementText("home-odds", odds["홈 승리 확률"] || "배당률 없음");
+                setElementText("draw-odds", odds["무승부 확률"] || "배당률 없음");
+                setElementText("away-odds", odds["원정 승리 확률"] || "배당률 없음");
+            }
+
+            console.log("✅ 경기 기본 정보 업데이트 완료");
+        });
+    }
+
+    loadMatchData();
+
+    // ✅ 실시간 경기 데이터 가져오기
+    function fetchLiveData() {
+        fetchJson(urls["live"]).then(liveData => {
+            if (!liveData) {
+                console.warn("⚠️ 실시간 데이터 없음");
+                return;
+            }
+
+            console.log("✅ 실시간 경기 데이터 로드 성공:", liveData);
+
+            // ✅ 경기 점수
+            let score = liveData["현재 점수"] || "⚽ 경기 시작 전";
+            let goals = liveData["득점 기록"] || [];
+            let events = liveData["주요 경기 이벤트"] || [];
+            let statistics = liveData["경기 통계"] || [];
+
+            let liveScoreElement = document.getElementById("live-score");
+            let goalRecordElement = document.getElementById("goal-record");
+            let matchEventsElement = document.getElementById("match-events");
+
+            // ✅ 득점 기록 변환
+            let goalText = goals.length > 0 ? goals.map(g => `⚽ ${g}`).join("<br>") : "득점 없음";
+
+            // ✅ 주요 경기 이벤트 변환
+            let eventText = events.length > 0 ? events.map(e => `📢 ${e}`).join("<br>") : "주요 이벤트 없음";
+
+            // ✅ 경기 통계 변환 (예: 점유율, 슈팅 수 등)
+            let statsText = statistics.length > 0
+                ? statistics.map(stat => `${stat["팀"]}: ${stat["항목"]} - ${stat["수치"]}`).join("<br>")
+                : "경기 통계 없음";
+
+            // ✅ HTML 업데이트
+            liveScoreElement.innerHTML = score;
+            goalRecordElement.innerHTML = goalText;
+            matchEventsElement.innerHTML = eventText;
+
+            console.log("✅ 실시간 경기 정보 업데이트 완료", liveData);
+        }).catch(error => {
+            console.error("❌ 실시간 경기 정보 로드 실패:", error);
+        });
+    }
+
+    // ✅ 사용자가 버튼을 클릭했을 때만 실시간 데이터 불러오기
+    let updateButton = document.getElementById("update-button");
+    updateButton.addEventListener("click", function () {
+        console.log("✅ 준실시간 업데이트 버튼 클릭됨: 실시간 데이터 불러오기 시작");
+        fetchLiveData();
+        updateButton.style.backgroundColor = "#90EE90"; // 옅은 녹색으로 버튼 변경
+        setTimeout(() => updateButton.style.backgroundColor = "#FFC0CB", 5000); // 5초 후 원래 색상 복귀
+    });
+});
