@@ -17,23 +17,30 @@ jobs:
       - name: 📥 저장소 체크아웃
         uses: actions/checkout@v3
 
-      - name: 🛠️ Python 환경 설정
+      - name: 🛠️ Python 환경 설정 및 캐싱
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Python 버전 설정
+          python-version: '3.9'
+          cache: 'pip'
 
       - name: 📦 필수 패키지 설치
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: ⏳ 경기 업데이트 주기 결정 및 실행
+      - name: ⏳ 경기 업데이트 실행
         run: |
-          python soccer-json-live/scripts/soccer-json-live_1208293.py
+          python scripts/soccer-json-live_1208293.py
 
       - name: 📤 변경된 데이터 푸시
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add data/*
-          git commit -m "🔄 경기 데이터 업데이트: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" || echo "No changes to commit"
-          git push || echo "No changes to push"
+          
+          if ! git diff --quiet; then
+            git add data/*
+            git commit -m "🔄 경기 데이터 업데이트: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            git push
+          else
+            echo "No changes to commit"
+          fi
