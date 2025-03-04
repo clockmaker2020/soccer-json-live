@@ -10,7 +10,7 @@ HEADERS = {"x-apisports-key": API_KEY}
 BASE_URL = "https://v3.football.api-sports.io/fixtures"
 
 # ✅ 저장할 폴더 설정
-DATA_DIR = r"C:\Users\clock_p93\Downloads"
+DATA_DIR = os.path.join(os.getcwd(), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ✅ API 요청 함수
