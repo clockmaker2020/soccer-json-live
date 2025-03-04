@@ -145,6 +145,7 @@ def determine_update_interval(match_id):
         return 60  # 연장전 포함, 1분 유지
 
 
+
 # ✅ 실행 루프
 def run_update_loop(match_id):
     while True:
@@ -156,13 +157,17 @@ def run_update_loop(match_id):
 
         get_match_data(match_id)
         print(f"🕒 {interval}초 후 데이터 업데이트 예정...")
-        time.sleep(interval)
 
-        # 경기 종료 감지
-        match_status = get_match_start_time(match_id)
-        if match_status and match_status in ["Match Finished", "Cancelled", "Postponed"]:
-            print("🏁 경기 종료됨. 업데이트 중단.")
-            break
+        # 경기 종료 여부 확인
+        match_details = fetch_data(f"{BASE_URL}?id={match_id}")
+        if match_details:
+            match_status = match_details[0]["fixture"]["status"]["long"]
+            print(f"📌 현재 경기 상태: {match_status}")
+            if match_status in ["Match Finished", "Cancelled", "Postponed"]:
+                print("🏁 경기 종료됨. 업데이트 중단.")
+                break
+
+        time.sleep(interval)
 
 # ✅ 실행 (경기 ID 입력 필요)
 if __name__ == "__main__":
