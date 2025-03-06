@@ -88,6 +88,17 @@ def get_match_data(match_id):
         }
     }
 
+    status_file = os.path.join(DATA_DIR, f"match_{match_id}_status.json")
+    with open(status_file, "w", encoding="utf-8") as f:
+        json.dump(match_status_data, f, ensure_ascii=False, indent=4)
+
+    start_file = os.path.join(DATA_DIR, f"match_{match_id}_start.json")
+    with open(start_file, "w", encoding="utf-8") as f:
+        json.dump(match_start_data, f, ensure_ascii=False, indent=4)
+
+
+
+    
     # 🔥 실시간 경기 정보
     live_data = {
         "현재 점수": f"{match_data['goals']['home']} - {match_data['goals']['away']}",
@@ -151,8 +162,10 @@ def get_match_data(match_id):
         json.dump(live_data, f, ensure_ascii=False, indent=4)
 
     print(f"✅ 경기 {match_id} 개요 저장 완료: match_{match_id}_overview.json")
-    print(f"✅ 경기 {match_id} 팀정보 저장 완료: match_{match_id}_teams.json")
-    print(f"✅ 경기 {match_id} 실시간 저장 완료: match_{match_id}_live.json")
+    print(f"✅ 경기 {match_id} 팀 정보 저장 완료: match_{match_id}_teams.json")
+    print(f"✅ 경기 {match_id} 실시간 경기 데이터 저장 완료: match_{match_id}_live.json")
+    print(f"✅ 경기 {match_id} 상태 저장 완료: match_{match_id}_status.json")
+    print(f"✅ 경기 {match_id} 시작 시간 저장 완료: match_{match_id}_start.json")
     
     
 # ✅ 실행 (경기 ID 입력 필요)
