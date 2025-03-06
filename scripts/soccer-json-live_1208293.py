@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 API_KEY = "0776a35eb1067086efe59bb7f93c6498"
 HEADERS = {"x-apisports-key": API_KEY}
 
-# ✅ 저장할 폴더 설정
-DATA_DIR = r"C:\Users\clock_p93\Downloads"
+# ✅ 저장할 폴더 설정 (GitHub 환경에 맞게 변경)
+DATA_DIR = os.path.join(os.getcwd(), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
-YML_FILE = os.path.join(DATA_DIR, "match_schedule.yml")
+
 
 # ✅ API 요청 함수
 def fetch_data(url):
@@ -155,14 +155,6 @@ def get_match_data(match_id):
     print(f"✅ 경기 {match_id} 실시간 저장 완료: match_{match_id}_live.json")
     
     
-    # ✅ YML 파일 저장
-    match_schedule = {
-        "match_id": match_id,
-        "start_time": kst_time.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    with open(YML_FILE, "w", encoding="utf-8") as f:
-        json.dump(match_schedule, f, ensure_ascii=False, indent=4)
-
 # ✅ 실행 (경기 ID 입력 필요)
 if __name__ == "__main__":
     match_id = 1208293  # 원하는 경기 ID로 변경
