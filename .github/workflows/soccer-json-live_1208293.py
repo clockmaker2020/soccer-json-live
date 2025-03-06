@@ -3,7 +3,7 @@ name: Match Update
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"  # 기본적으로 10분마다 실행 (초기 상태)
+    - cron: "0 */6 * * *"  # 기본적으로 6시간마다 실행 (경기 전)
 
 jobs:
   update-match:
@@ -35,9 +35,12 @@ jobs:
         run: |
           if [ -f "data/match_1208293_start.json" ]; then
             MATCH_START=$(jq -r '.start_time' data/match_1208293_start.json)
+            MATCH_850_TIME=$(date -u -d "$MATCH_START -10 minutes" +"%Y-%m-%d %H:%M:%S")
             echo "MATCH_START=\"$MATCH_START\"" >> $GITHUB_ENV
+            echo "MATCH_850_TIME=\"$MATCH_850_TIME\"" >> $GITHUB_ENV
           else
             echo "MATCH_START=UNKNOWN" >> $GITHUB_ENV
+            echo "MATCH_850_TIME=UNKNOWN" >> $GITHUB_ENV
           fi
 
       - name: 이전 경기 상태 확인
@@ -50,21 +53,22 @@ jobs:
             echo "MATCH_STATUS=UNKNOWN" >> $GITHUB_ENV
           fi
 
-      - name: 경기 시작 10분 전인지 확인 후 업데이트 주기 조정
+      - name: 현재 시간과 경기 시작 10분 전 시간 비교 후 업데이트 주기 결정
         id: update_schedule
         run: |
-          if [ "$MATCH_START" != "UNKNOWN" ]; then
-            CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+          CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S")
+
+          if [ "$MATCH_START" != "UNKNOWN" ] && [ "$MATCH_850_TIME" != "UNKNOWN" ]; then
             MATCH_START_TIME=$(date -u -d "$MATCH_START" +"%Y-%m-%d %H:%M:%S")
-            TIME_DIFF=$(( $(date -d "$MATCH_START_TIME" +%s) - $(date -d "$CURRENT_TIME" +%s) ))
-            
-            if [ $TIME_DIFF -le 600 ] && [ $TIME_DIFF -gt 0 ]; then
-              echo "UPDATE_INTERVAL=1" >> $GITHUB_ENV
+            MATCH_850_TIME_VAL=$(date -u -d "$MATCH_850_TIME" +"%Y-%m-%d %H:%M:%S")
+
+            if [ "$CURRENT_TIME" \< "$MATCH_850_TIME_VAL" ]; then
+              echo "UPDATE_INTERVAL=360" >> $GITHUB_ENV  # 6시간마다 (경기 전 10분 전까지)
             else
-              echo "UPDATE_INTERVAL=10" >> $GITHUB_ENV
+              echo "UPDATE_INTERVAL=1" >> $GITHUB_ENV  # 1분마다 (경기 시작 10분 전 이후)
             fi
           else
-            echo "UPDATE_INTERVAL=10" >> $GITHUB_ENV
+            echo "UPDATE_INTERVAL=360" >> $GITHUB_ENV  # 기본 6시간마다 업데이트
           fi
 
       - name: 경기 데이터 업데이트
@@ -91,7 +95,7 @@ jobs:
         if: env.MATCH_STATUS != 'STOP'
         run: |
           if [ "$UPDATE_INTERVAL" == "1" ]; then
-            echo "⏳ 경기 시작 10분 전, 1분 간격 업데이트!"
+            echo "⏳ 경기 시작 10분 전 이후, 1분 간격 업데이트!"
           else
-            echo "⌛ 기본 10분 간격 업데이트"
+            echo "⌛ 경기 시작 10분 전 전까지, 6시간 간격 업데이트"
           fi
